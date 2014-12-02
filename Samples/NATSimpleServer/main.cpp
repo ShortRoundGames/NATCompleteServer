@@ -2,7 +2,7 @@
 #include "NatPunchthroughServer.h"
 #include "RakSleep.h"
 
-const USHORT MAX_CONNECTIONS = 65535;
+const unsigned short MAX_CONNECTIONS = 65535;
 
 struct NatPunchthroughServerDebugInterface_SimpleServer : public RakNet::NatPunchthroughServerDebugInterface
 {
