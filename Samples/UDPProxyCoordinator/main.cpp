@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 {
     char* coordinatorPassword = "balls";
     char* connectPassword = "";
-    USHORT port = 60000;
+    unsigned short port = 60000;
     
     for (int i = 0; i < argc; ++i)
     {
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
         }
         else if (!strcmp(argv[i], "-port") && i < (argc - 1))
         {
-            port = (USHORT)atoi(argv[i + 1]);
+            port = (unsigned short)atoi(argv[i + 1]);
         }
     }
         

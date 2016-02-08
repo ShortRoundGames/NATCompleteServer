@@ -51,7 +51,7 @@ bool Connect(RakNet::RakPeerInterface* peer, char* addressAndPort, char* passwor
 
     if (address && portString)
     {
-        USHORT port = (USHORT)atoi(portString);
+        unsigned short port = (unsigned short)atoi(portString);
         peer->Connect(address, port, password, strlen(password));
         return true;
     }
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     char* externalAddress = NULL;
     char* externalServer = NULL;
 
-    USHORT port = 60000;
+    unsigned short port = 60000;
     
     for (int i = 0; i < argc; ++i)
     {
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
         }
         else if (!strcmp(argv[i], "-port") && i < (argc - 1))
         {
-            port = (USHORT)atoi(argv[i + 1]);
+            port = (unsigned short)atoi(argv[i + 1]);
         }
     }
 
