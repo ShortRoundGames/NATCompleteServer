@@ -6,7 +6,11 @@
 #include "UDPProxyServer.h"
 #include "MessageIdentifiers.h"
 
+using namespace RakNet;
+
 const unsigned short MAX_CONNECTIONS = 65535;
+
+bool g_terminate = false;
 
 struct UDPProxyServerResultHandler_SimpleServer : public RakNet::UDPProxyServerResultHandler
 {
@@ -21,10 +25,12 @@ struct UDPProxyServerResultHandler_SimpleServer : public RakNet::UDPProxyServerR
     virtual void OnNoPasswordSet(RakNet::RakString usedPassword, RakNet::UDPProxyServer *proxyServerPlugin)
     {
         printf("Failed login to UDPProxyCoordinator. No password set.\n");
+        g_terminate = true;
     }
     virtual void OnWrongPassword(RakNet::RakString usedPassword, RakNet::UDPProxyServer *proxyServerPlugin)
     {
         printf("Failed login to UDPProxyCoordinator. Wrong password.\n");
+        g_terminate = true;
     }
 };
 
@@ -58,20 +64,28 @@ bool Connect(RakNet::RakPeerInterface* peer, char* addressAndPort, char* passwor
 
 eConnectTarget LoginToCoordinator(RakNet::RakPeerInterface* peer, RakNet::UDPProxyServer* proxyServer, char* connectPassword, char* coordinatorAddress, char* coordinatorPassword)
 {
-    if (coordinatorAddress)
+    if (Connect(peer, coordinatorAddress, connectPassword))
     {
-        if (Connect(peer, coordinatorAddress, connectPassword))
-        {
-            return COORDINATOR;
-        }
-    }
-    else
-    {
-        proxyServer->LoginToCoordinator(coordinatorPassword, peer->GetInternalID(RakNet::UNASSIGNED_SYSTEM_ADDRESS, 0));
+        return COORDINATOR;
     }
 
     return NONE;
 }
+
+void ConnectFailure(eConnectTarget target, const char* errorCode)
+{
+    if (target == COORDINATOR)
+    {
+        printf("Failed to connect to coordinator: %s\n", errorCode);
+    }
+    else if (target == EXTERNAL)
+    {
+        printf("Failed to connect to external server: %s\n", errorCode);
+    }
+}
+
+#define STARTUP_ERROR_CASE(X) case X: printf(#X); break;
+#define CONNECT_ERROR_CASE(X) case X: ConnectFailure(target, #X); return -1;
 
 int main(int argc, char *argv[])
 {
@@ -112,19 +126,16 @@ int main(int argc, char *argv[])
         }
     }
 
-    eConnectTarget target = NONE;
+    if (coordinatorAddress == NULL)
+    {
+        printf("-coordinator argument not provided. Don't know what coordinator to use");
+        return -1;
+    }
 
-    RakNet::UDPProxyCoordinator* proxyCoordinator = NULL;
-    
+    eConnectTarget target = NONE;
+        
 	RakNet::RakPeerInterface *peer = RakNet::RakPeerInterface::GetInstance();
 	peer->SetMaximumIncomingConnections(MAX_CONNECTIONS);
-
-    if (!coordinatorAddress)
-    {
-        proxyCoordinator = new RakNet::UDPProxyCoordinator();
-        proxyCoordinator->SetRemoteLoginPassword(coordinatorPassword);
-        peer->AttachPlugin(proxyCoordinator);
-    }
 
     RakNet::UDPProxyServer proxyServer;
     UDPProxyServerResultHandler_SimpleServer resultHandler;
@@ -138,6 +149,26 @@ int main(int argc, char *argv[])
         peer->SetIncomingPassword(connectPassword, strlen(connectPassword));
 
     printf("RakPeer startup %d\n", result);
+
+    if (result != 0)
+    {
+        switch (result)
+        {
+            STARTUP_ERROR_CASE(RAKNET_ALREADY_STARTED);
+            STARTUP_ERROR_CASE(INVALID_SOCKET_DESCRIPTORS);
+            STARTUP_ERROR_CASE(INVALID_MAX_CONNECTIONS);
+            STARTUP_ERROR_CASE(SOCKET_FAMILY_NOT_SUPPORTED);
+            STARTUP_ERROR_CASE(SOCKET_PORT_ALREADY_IN_USE);
+            STARTUP_ERROR_CASE(SOCKET_FAILED_TO_BIND);
+            STARTUP_ERROR_CASE(SOCKET_FAILED_TEST_SEND);
+            STARTUP_ERROR_CASE(PORT_CANNOT_BE_ZERO);
+            STARTUP_ERROR_CASE(FAILED_TO_CREATE_NETWORK_THREAD);
+            STARTUP_ERROR_CASE(COULD_NOT_GENERATE_GUID);
+            STARTUP_ERROR_CASE(STARTUP_OTHER_FAILURE);
+        }
+
+        return -1;
+    }
 
     //If running the coordinator and server on the same peer, then we need to deduce our external IP.
     //Easiest way to do this is to connect to the punchthrough server and look at our external IP address for it
@@ -186,26 +217,19 @@ int main(int argc, char *argv[])
                 break;
             }
 
-            case ID_CONNECTION_ATTEMPT_FAILED:
-            case ID_ALREADY_CONNECTED:
-            case ID_NO_FREE_INCOMING_CONNECTIONS:
-            case ID_CONNECTION_BANNED:
-            case ID_INVALID_PASSWORD:
-            {
-                if (target == COORDINATOR)
-                {
-                    printf("Failed to connect to coordinator, code %d\n", p->data[0]);
-                }
-                else if (target == EXTERNAL)
-                {
-                    printf("Failed to connect to external server, code %d\n", p->data[0]);
-                }
-                break;
-            }
+            CONNECT_ERROR_CASE(ID_CONNECTION_ATTEMPT_FAILED);
+            CONNECT_ERROR_CASE(ID_ALREADY_CONNECTED);
+            CONNECT_ERROR_CASE(ID_NO_FREE_INCOMING_CONNECTIONS);
+            CONNECT_ERROR_CASE(ID_CONNECTION_BANNED);
+            CONNECT_ERROR_CASE(ID_INVALID_PASSWORD);
             }
 		}
 
 		// Keep raknet threads responsive
 		RakSleep(30);
+
+        if (g_terminate)
+            return -1;
 	}
+
 }
