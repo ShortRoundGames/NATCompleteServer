@@ -28,36 +28,134 @@ struct UDPProxyServerResultHandler_SimpleServer : public RakNet::UDPProxyServerR
     }
 };
 
-int main(void)
+enum eConnectTarget
 {
+    NONE,
+    COORDINATOR,
+    EXTERNAL
+};
+
+bool Connect(RakNet::RakPeerInterface* peer, char* addressAndPort, char* password)
+{
+    char* addressCopy = new char[strlen(addressAndPort) + 1];
+    strcpy(addressCopy, addressAndPort);
+
+    char* address = strtok(addressCopy, ":");
+    char* portString = strtok(NULL, ":");
+
+    if (address && portString)
+    {
+        USHORT port = (USHORT)atoi(portString);
+        peer->Connect(address, port, password, strlen(password));
+        return true;
+    }
+    else
+    {
+        printf("addresses should be in form 'address:port'");
+        return false;
+    }
+}
+
+eConnectTarget LoginToCoordinator(RakNet::RakPeerInterface* peer, RakNet::UDPProxyServer* proxyServer, char* connectPassword, char* coordinatorAddress, char* coordinatorPassword)
+{
+    if (coordinatorAddress)
+    {
+        if (Connect(peer, coordinatorAddress, connectPassword))
+        {
+            return COORDINATOR;
+        }
+    }
+    else
+    {
+        proxyServer->LoginToCoordinator(coordinatorPassword, peer->GetInternalID(RakNet::UNASSIGNED_SYSTEM_ADDRESS, 0));
+    }
+
+    return NONE;
+}
+
+int main(int argc, char *argv[])
+{
+    char* coordinatorPassword = "balls";
+    char* connectPassword = "";
+
+    char* coordinatorAddress = NULL;
+    char* externalAddress = NULL;
+    char* externalServer = NULL;
+
+    USHORT port = 60000;
+    
+    for (int i = 0; i < argc; ++i)
+    {
+        if (!strcmp(argv[i], "-coordinatorPassword") && i < (argc - 1))
+        {
+            coordinatorPassword = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-coordinator") && i < (argc - 1))
+        {
+            coordinatorAddress = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-connectPassword") && i < (argc - 1))
+        {
+            connectPassword = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-externalAddress") && i < (argc - 1))
+        {
+            externalAddress = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-externalServer") && i < (argc - 1))
+        {
+            externalServer = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-port") && i < (argc - 1))
+        {
+            port = (USHORT)atoi(argv[i + 1]);
+        }
+    }
+
+    eConnectTarget target = NONE;
+
+    RakNet::UDPProxyCoordinator* proxyCoordinator = NULL;
+    
 	RakNet::RakPeerInterface *peer = RakNet::RakPeerInterface::GetInstance();
 	peer->SetMaximumIncomingConnections(MAX_CONNECTIONS);
 
-    RakNet::UDPProxyCoordinator proxyCoordinator;
-    proxyCoordinator.SetRemoteLoginPassword("balls");
-    peer->AttachPlugin(&proxyCoordinator);
+    if (!coordinatorAddress)
+    {
+        proxyCoordinator = new RakNet::UDPProxyCoordinator();
+        proxyCoordinator->SetRemoteLoginPassword(coordinatorPassword);
+        peer->AttachPlugin(proxyCoordinator);
+    }
 
     RakNet::UDPProxyServer proxyServer;
     UDPProxyServerResultHandler_SimpleServer resultHandler;
     proxyServer.SetResultHandler(&resultHandler);
     peer->AttachPlugin(&proxyServer);
 
-    RakNet::SocketDescriptor socketDescriptor(60000, 0);
+    RakNet::SocketDescriptor socketDescriptor(port, 0);
     RakNet::StartupResult result = peer->Startup(MAX_CONNECTIONS, &socketDescriptor, 1);
+
+    if (connectPassword[0])
+        peer->SetIncomingPassword(connectPassword, strlen(connectPassword));
 
     printf("RakPeer startup %d\n", result);
 
     //If running the coordinator and server on the same peer, then we need to deduce our external IP.
     //Easiest way to do this is to connect to the punchthrough server and look at our external IP address for it
-
-    bool m_needToDeduceExternalIp = true;
-
-    //proxyServer.LoginToCoordinator("balls", RakNet::UNASSIGNED_SYSTEM_ADDRESS);
-
-    if (m_needToDeduceExternalIp)
-        peer->Connect("54.173.17.206", 60000, "", 0);
+        
+    if (externalServer)
+    {
+        if (Connect(peer, externalServer, ""))
+        {
+            target = EXTERNAL;
+        }
+    }
     else
-        proxyServer.LoginToCoordinator("balls", peer->GetInternalID(RakNet::UNASSIGNED_SYSTEM_ADDRESS, 0));
+    {
+        if (externalAddress)
+            proxyServer.SetServerPublicIP(externalAddress);
+
+        target = LoginToCoordinator(peer, &proxyServer, connectPassword, coordinatorAddress, coordinatorPassword);
+    }
 
 	while (true)
 	{
@@ -65,18 +163,45 @@ int main(void)
 			p != NULL;
 			peer->DeallocatePacket(p), p = peer->Receive())
 		{
-			//printf("Packet %d %s\n", p->data[0], p->systemAddress.ToString());
+            //printf("Packet %d %d %s\n", p->data[0], p->data[1], p->systemAddress.ToString());
 
-            if (m_needToDeduceExternalIp && p->data[0] == ID_CONNECTION_REQUEST_ACCEPTED)
+            switch (p->data[0])
             {
-                RakNet::SystemAddress externalAddress = peer->GetExternalID(p->systemAddress);
-                printf("%s\n", externalAddress.ToString());
-                proxyServer.SetServerPublicIP(externalAddress.ToString(false));
-                peer->CloseConnection(p->systemAddress, false);
+            case ID_CONNECTION_REQUEST_ACCEPTED:
+            {
+                if (target == COORDINATOR)
+                {
+                    target = NONE;
+                    proxyServer.LoginToCoordinator(coordinatorPassword, p->systemAddress);
+                }
+                else if (target == EXTERNAL)
+                {
+                    RakNet::SystemAddress externalSystemAddress = peer->GetExternalID(p->systemAddress);
+                    printf("External address detected as %s\n", externalSystemAddress.ToString());
+                    proxyServer.SetServerPublicIP(externalSystemAddress.ToString(false));
+                    peer->CloseConnection(p->systemAddress, false);
 
-                proxyServer.LoginToCoordinator("balls", peer->GetInternalID(RakNet::UNASSIGNED_SYSTEM_ADDRESS, 0));
+                    target = LoginToCoordinator(peer, &proxyServer, connectPassword, coordinatorAddress, coordinatorPassword);
+                }
+                break;
+            }
 
-                m_needToDeduceExternalIp = false;
+            case ID_CONNECTION_ATTEMPT_FAILED:
+            case ID_ALREADY_CONNECTED:
+            case ID_NO_FREE_INCOMING_CONNECTIONS:
+            case ID_CONNECTION_BANNED:
+            case ID_INVALID_PASSWORD:
+            {
+                if (target == COORDINATOR)
+                {
+                    printf("Failed to connect to coordinator, code %d\n", p->data[0]);
+                }
+                else if (target == EXTERNAL)
+                {
+                    printf("Failed to connect to external server, code %d\n", p->data[0]);
+                }
+                break;
+            }
             }
 		}
 
