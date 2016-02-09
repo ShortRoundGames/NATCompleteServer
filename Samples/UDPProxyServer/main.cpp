@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
         if (externalAddress)
             proxyServer.SetServerPublicIP(externalAddress);
 
-        target = LoginToCoordinator(peer, &proxyServer, connectPassword, coordinatorAddress, coordinatorPassword);
+        target = LoginToCoordinator(peer, &proxyServer, clientPassword, coordinatorAddress, coordinatorPassword);
     }
 
 	while (true)
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
                     proxyServer.SetServerPublicIP(externalSystemAddress.ToString(false));
                     peer->CloseConnection(p->systemAddress, false);
 
-                    target = LoginToCoordinator(peer, &proxyServer, connectPassword, coordinatorAddress, coordinatorPassword);
+                    target = LoginToCoordinator(peer, &proxyServer, clientPassword, coordinatorAddress, coordinatorPassword);
                 }
                 break;
             }
