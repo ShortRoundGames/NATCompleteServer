@@ -110,7 +110,7 @@ void ConnectFailure(eConnectTarget target, const char* errorCode)
 int main(int argc, char *argv[])
 {
     char* coordinatorPassword = "balls";
-    char* connectPassword = "";
+    char* clientPassword = "";
 
     char* coordinatorAddress = NULL;
     char* externalAddress = NULL;
@@ -129,9 +129,9 @@ int main(int argc, char *argv[])
         {
             coordinatorAddress = argv[i + 1];
         }
-        else if (!strcmp(argv[i], "-connectPassword") && i < (argc - 1))
+        else if (!strcmp(argv[i], "-clientPassword") && i < (argc - 1))
         {
-            connectPassword = argv[i + 1];
+            clientPassword = argv[i + 1];
         }
         else if (!strcmp(argv[i], "-externalAddress") && i < (argc - 1))
         {
@@ -182,8 +182,8 @@ int main(int argc, char *argv[])
     RakNet::SocketDescriptor socketDescriptor(port, 0);
     RakNet::StartupResult result = peer->Startup(MAX_CONNECTIONS, &socketDescriptor, 1);
 
-    if (connectPassword[0])
-        peer->SetIncomingPassword(connectPassword, strlen(connectPassword));
+    if (clientPassword[0])
+        peer->SetIncomingPassword(clientPassword, strlen(clientPassword));
 
     Log("RakPeer startup %d\n", result);
 

@@ -35,7 +35,7 @@ void Log(const char * format, ...)
 int main(int argc, char *argv[])
 {
     char* coordinatorPassword = "balls";
-    char* connectPassword = "";
+    char* clientPassword = "";
     unsigned short port = 60000;
     char* logFilename = NULL;
     
@@ -45,9 +45,9 @@ int main(int argc, char *argv[])
         {
             coordinatorPassword = argv[i + 1];
         }
-        else if (!strcmp(argv[i], "-connectPassword") && i < (argc - 1))
+        else if (!strcmp(argv[i], "-clientPassword") && i < (argc - 1))
         {
-            connectPassword = argv[i + 1];
+            clientPassword = argv[i + 1];
         }
         else if (!strcmp(argv[i], "-port") && i < (argc - 1))
         {
@@ -81,8 +81,8 @@ int main(int argc, char *argv[])
     RakNet::SocketDescriptor socketDescriptor(port, 0);
     RakNet::StartupResult result = peer->Startup(MAX_CONNECTIONS, &socketDescriptor, 1);
 
-    if (connectPassword[0])
-        peer->SetIncomingPassword(connectPassword, strlen(connectPassword));
+    if (clientPassword[0])
+        peer->SetIncomingPassword(clientPassword, strlen(clientPassword));
 
     Log("RakPeer startup %d\n", result);
 
