@@ -1,6 +1,7 @@
 //Starts a RakNet peer on port 60000 and runs a punchthrough server. No extra fluff
 
 #include "RakPeerInterface.h"
+#include "RakPeer.h"
 #include "RakSleep.h"
 #include "UDPProxyCoordinator.h"
 #include "UDPProxyServer.h"
@@ -11,25 +12,43 @@ using namespace RakNet;
 const unsigned short MAX_CONNECTIONS = 65535;
 
 bool g_terminate = false;
+FILE* g_logFile;
+
+void Log(const char * format, ...)
+{
+    char buffer[1024];
+
+    va_list args;
+    va_start(args, format);
+    vsprintf(buffer, format, args);
+    va_end(args);
+
+    printf(buffer);
+    if (g_logFile)
+    {
+        fputs(buffer, g_logFile);
+        fflush(g_logFile);
+    }
+}
 
 struct UDPProxyServerResultHandler_SimpleServer : public RakNet::UDPProxyServerResultHandler
 {
     virtual void OnLoginSuccess(RakNet::RakString usedPassword, RakNet::UDPProxyServer *proxyServerPlugin)
     {
-        printf("Logged into UDPProxyCoordinator.\n");
+        Log("Logged into UDPProxyCoordinator.\n");
     }
     virtual void OnAlreadyLoggedIn(RakNet::RakString usedPassword, RakNet::UDPProxyServer *proxyServerPlugin)
     {
-        printf("Already logged into UDPProxyCoordinator.\n");
+        Log("Already logged into UDPProxyCoordinator.\n");
     }
     virtual void OnNoPasswordSet(RakNet::RakString usedPassword, RakNet::UDPProxyServer *proxyServerPlugin)
     {
-        printf("Failed login to UDPProxyCoordinator. No password set.\n");
+        Log("Failed login to UDPProxyCoordinator. No password set.\n");
         g_terminate = true;
     }
     virtual void OnWrongPassword(RakNet::RakString usedPassword, RakNet::UDPProxyServer *proxyServerPlugin)
     {
-        printf("Failed login to UDPProxyCoordinator. Wrong password.\n");
+        Log("Failed login to UDPProxyCoordinator. Wrong password.\n");
         g_terminate = true;
     }
 };
@@ -53,13 +72,14 @@ bool Connect(RakNet::RakPeerInterface* peer, char* addressAndPort, char* passwor
     {
         unsigned short port = (unsigned short)atoi(portString);
         peer->Connect(address, port, password, strlen(password));
-        return true;
     }
     else
     {
-        printf("addresses should be in form 'address:port'");
-        return false;
+        Log("addresses should be in form 'address:port'");
     }
+
+    delete[] addressCopy;
+    return (address && portString);
 }
 
 eConnectTarget LoginToCoordinator(RakNet::RakPeerInterface* peer, RakNet::UDPProxyServer* proxyServer, char* connectPassword, char* coordinatorAddress, char* coordinatorPassword)
@@ -76,15 +96,15 @@ void ConnectFailure(eConnectTarget target, const char* errorCode)
 {
     if (target == COORDINATOR)
     {
-        printf("Failed to connect to coordinator: %s\n", errorCode);
+        Log("Failed to connect to coordinator: %s\n", errorCode);
     }
     else if (target == EXTERNAL)
     {
-        printf("Failed to connect to external server: %s\n", errorCode);
+        Log("Failed to connect to external server: %s\n", errorCode);
     }
 }
 
-#define STARTUP_ERROR_CASE(X) case X: printf(#X); break;
+#define STARTUP_ERROR_CASE(X) case X: Log("%s\n", #X); break;
 #define CONNECT_ERROR_CASE(X) case X: ConnectFailure(target, #X); return -1;
 
 int main(int argc, char *argv[])
@@ -95,6 +115,7 @@ int main(int argc, char *argv[])
     char* coordinatorAddress = NULL;
     char* externalAddress = NULL;
     char* externalServer = NULL;
+    char* logFilename = NULL;
 
     unsigned short port = 60000;
     
@@ -124,11 +145,27 @@ int main(int argc, char *argv[])
         {
             port = (unsigned short)atoi(argv[i + 1]);
         }
+        else if (!strcmp(argv[i], "-logFile") && i < (argc - 1))
+        {
+            logFilename = argv[i + 1];
+        }
+    }
+
+    if (logFilename)
+    {
+        g_logFile = fopen(logFilename, "a");
+        if (g_logFile)
+        {
+            fputs("\n", g_logFile);
+            fflush(g_logFile);
+        }
+
+        RakNet::OpenLogFile(logFilename);
     }
 
     if (coordinatorAddress == NULL)
     {
-        printf("-coordinator argument not provided. Don't know what coordinator to use");
+        Log("-coordinator argument not provided. Don't know what coordinator to use\n");
         return -1;
     }
 
@@ -148,7 +185,7 @@ int main(int argc, char *argv[])
     if (connectPassword[0])
         peer->SetIncomingPassword(connectPassword, strlen(connectPassword));
 
-    printf("RakPeer startup %d\n", result);
+    Log("RakPeer startup %d\n", result);
 
     if (result != 0)
     {
@@ -194,7 +231,7 @@ int main(int argc, char *argv[])
 			p != NULL;
 			peer->DeallocatePacket(p), p = peer->Receive())
 		{
-            //printf("Packet %d %d %s\n", p->data[0], p->data[1], p->systemAddress.ToString());
+            //Log("Packet %d %d %s\n", p->data[0], p->data[1], p->systemAddress.ToString());
 
             switch (p->data[0])
             {
@@ -208,7 +245,7 @@ int main(int argc, char *argv[])
                 else if (target == EXTERNAL)
                 {
                     RakNet::SystemAddress externalSystemAddress = peer->GetExternalID(p->systemAddress);
-                    printf("External address detected as %s\n", externalSystemAddress.ToString());
+                    Log("External address detected as %s\n", externalSystemAddress.ToString());
                     proxyServer.SetServerPublicIP(externalSystemAddress.ToString(false));
                     peer->CloseConnection(p->systemAddress, false);
 

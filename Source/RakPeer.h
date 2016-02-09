@@ -1031,6 +1031,8 @@ protected:
 
 void RAK_DLL_EXPORT SetLogFunc(void(*logFunc)(const char*, int, const char*));
 
+FILE* OpenLogFile(const char* filename);
+
 } // namespace RakNet
 
 #endif

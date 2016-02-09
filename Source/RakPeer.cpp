@@ -6500,6 +6500,8 @@ namespace RakNet
 		g_logFunc = logFunc;
 	}
 
+    FILE* g_logFile = NULL;
+
 	void externalLog(const char* fileName, int lineNumber, const char * format, ...)
 	{
 		if (g_logFunc)
@@ -6520,7 +6522,26 @@ namespace RakNet
 			vprintf(format, args);
 			va_end(args);
 		}
+
+        if (g_logFile)
+        {
+            char buffer[4096];
+
+            va_list args;
+            va_start(args, format);
+            vsprintf(buffer, format, args);
+            va_end(args);
+
+            fputs(buffer, g_logFile);
+            fflush(g_logFile);
+        }
 	}
+
+    FILE* OpenLogFile(const char* filename)
+    {
+        g_logFile = fopen(filename, "a");
+        return g_logFile;
+    }
 }
 
 // #if defined(RMO_NEW_UNDEF_ALLOCATING_QUEUE)
