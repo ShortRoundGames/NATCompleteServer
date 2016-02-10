@@ -30,6 +30,28 @@ void Log(const char * format, ...)
     }
 }
 
+#define STARTUP_RESULT_CASE(X) case X: return #X; break;
+const char* ToString(StartupResult result)
+{
+    switch (result)
+    {
+        STARTUP_RESULT_CASE(RAKNET_STARTED);
+        STARTUP_RESULT_CASE(RAKNET_ALREADY_STARTED);
+        STARTUP_RESULT_CASE(INVALID_SOCKET_DESCRIPTORS);
+        STARTUP_RESULT_CASE(INVALID_MAX_CONNECTIONS);
+        STARTUP_RESULT_CASE(SOCKET_FAMILY_NOT_SUPPORTED);
+        STARTUP_RESULT_CASE(SOCKET_PORT_ALREADY_IN_USE);
+        STARTUP_RESULT_CASE(SOCKET_FAILED_TO_BIND);
+        STARTUP_RESULT_CASE(SOCKET_FAILED_TEST_SEND);
+        STARTUP_RESULT_CASE(PORT_CANNOT_BE_ZERO);
+        STARTUP_RESULT_CASE(FAILED_TO_CREATE_NETWORK_THREAD);
+        STARTUP_RESULT_CASE(COULD_NOT_GENERATE_GUID);
+        STARTUP_RESULT_CASE(STARTUP_OTHER_FAILURE);
+    }
+
+    return "(unknown)";
+}
+
 #define STARTUP_ERROR_CASE(X) case X: Log(#X); break;
 
 int main(int argc, char *argv[])
@@ -83,28 +105,11 @@ int main(int argc, char *argv[])
 
     if (clientPassword[0])
         peer->SetIncomingPassword(clientPassword, strlen(clientPassword));
+    
+    Log("RakPeer startup %s\n", ToString(result));
 
-    Log("RakPeer startup %d\n", result);
-
-    if (result != 0)
-    {
-        switch (result)
-        {
-            STARTUP_ERROR_CASE(RAKNET_ALREADY_STARTED);
-            STARTUP_ERROR_CASE(INVALID_SOCKET_DESCRIPTORS);
-            STARTUP_ERROR_CASE(INVALID_MAX_CONNECTIONS);
-            STARTUP_ERROR_CASE(SOCKET_FAMILY_NOT_SUPPORTED);
-            STARTUP_ERROR_CASE(SOCKET_PORT_ALREADY_IN_USE);
-            STARTUP_ERROR_CASE(SOCKET_FAILED_TO_BIND);
-            STARTUP_ERROR_CASE(SOCKET_FAILED_TEST_SEND);
-            STARTUP_ERROR_CASE(PORT_CANNOT_BE_ZERO);
-            STARTUP_ERROR_CASE(FAILED_TO_CREATE_NETWORK_THREAD);
-            STARTUP_ERROR_CASE(COULD_NOT_GENERATE_GUID);
-            STARTUP_ERROR_CASE(STARTUP_OTHER_FAILURE);
-        }
-
+    if (result != RAKNET_STARTED)
         return -1;
-    }
 
     //If running the coordinator and server on the same peer, then we need to deduce our external IP.
     //Easiest way to do this is to connect to the punchthrough server and look at our external IP address for it

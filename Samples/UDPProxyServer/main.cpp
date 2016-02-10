@@ -7,6 +7,8 @@
 #include "UDPProxyServer.h"
 #include "MessageIdentifiers.h"
 
+#include <time.h> 
+
 using namespace RakNet;
 
 const unsigned short MAX_CONNECTIONS = 65535;
@@ -60,6 +62,62 @@ enum eConnectTarget
     EXTERNAL
 };
 
+
+#define CONNECTION_ATTEMPT_RESULT_CASE(X) case X: return #X; break;
+const char* ToString(ConnectionAttemptResult result)
+{
+    switch (result)
+    {
+        CONNECTION_ATTEMPT_RESULT_CASE(CONNECTION_ATTEMPT_STARTED);
+        CONNECTION_ATTEMPT_RESULT_CASE(INVALID_PARAMETER);
+        CONNECTION_ATTEMPT_RESULT_CASE(CANNOT_RESOLVE_DOMAIN_NAME);
+        CONNECTION_ATTEMPT_RESULT_CASE(ALREADY_CONNECTED_TO_ENDPOINT);
+        CONNECTION_ATTEMPT_RESULT_CASE(CONNECTION_ATTEMPT_ALREADY_IN_PROGRESS);
+        CONNECTION_ATTEMPT_RESULT_CASE(SECURITY_INITIALIZATION_FAILED);
+    }
+
+    return "(unknown)";
+}
+
+#define STARTUP_RESULT_CASE(X) case X: return #X; break;
+const char* ToString(StartupResult result)
+{
+    switch (result)
+    {
+        STARTUP_RESULT_CASE(RAKNET_STARTED);
+        STARTUP_RESULT_CASE(RAKNET_ALREADY_STARTED);
+        STARTUP_RESULT_CASE(INVALID_SOCKET_DESCRIPTORS);
+        STARTUP_RESULT_CASE(INVALID_MAX_CONNECTIONS);
+        STARTUP_RESULT_CASE(SOCKET_FAMILY_NOT_SUPPORTED);
+        STARTUP_RESULT_CASE(SOCKET_PORT_ALREADY_IN_USE);
+        STARTUP_RESULT_CASE(SOCKET_FAILED_TO_BIND);
+        STARTUP_RESULT_CASE(SOCKET_FAILED_TEST_SEND);
+        STARTUP_RESULT_CASE(PORT_CANNOT_BE_ZERO);
+        STARTUP_RESULT_CASE(FAILED_TO_CREATE_NETWORK_THREAD);
+        STARTUP_RESULT_CASE(COULD_NOT_GENERATE_GUID);
+        STARTUP_RESULT_CASE(STARTUP_OTHER_FAILURE);
+    }
+
+    return "(unknown)";
+}
+
+#define MESSAGE_ID_CASE(X) case X: return #X; break;
+const char* ToString(unsigned char id)
+{
+    switch (id)
+    {
+        MESSAGE_ID_CASE(ID_CONNECTION_REQUEST_ACCEPTED);
+        MESSAGE_ID_CASE(ID_CONNECTION_LOST);
+        MESSAGE_ID_CASE(ID_CONNECTION_ATTEMPT_FAILED);
+        MESSAGE_ID_CASE(ID_ALREADY_CONNECTED);
+        MESSAGE_ID_CASE(ID_NO_FREE_INCOMING_CONNECTIONS);
+        MESSAGE_ID_CASE(ID_CONNECTION_BANNED);
+        MESSAGE_ID_CASE(ID_INVALID_PASSWORD);
+    }
+
+    return "(unknown)";
+}
+
 bool Connect(RakNet::RakPeerInterface* peer, char* addressAndPort, char* password)
 {
     char* addressCopy = new char[strlen(addressAndPort) + 1];
@@ -68,10 +126,15 @@ bool Connect(RakNet::RakPeerInterface* peer, char* addressAndPort, char* passwor
     char* address = strtok(addressCopy, ":");
     char* portString = strtok(NULL, ":");
 
+    bool success = false;
+
     if (address && portString)
     {
         unsigned short port = (unsigned short)atoi(portString);
-        peer->Connect(address, port, password, strlen(password));
+        ConnectionAttemptResult result = peer->Connect(address, port, password, strlen(password));
+        Log("ConnectionAttemptResult for %s : %s\n", addressAndPort, ToString(result));
+
+        success = (result == CONNECTION_ATTEMPT_STARTED);
     }
     else
     {
@@ -79,33 +142,28 @@ bool Connect(RakNet::RakPeerInterface* peer, char* addressAndPort, char* passwor
     }
 
     delete[] addressCopy;
-    return (address && portString);
+    return success;
 }
 
-eConnectTarget LoginToCoordinator(RakNet::RakPeerInterface* peer, RakNet::UDPProxyServer* proxyServer, char* connectPassword, char* coordinatorAddress, char* coordinatorPassword)
+time_t g_reconnectTime = -1;
+time_t g_reconnectTimeDelta = 10;
+
+void ResetReconnectTimeDelta()
 {
-    if (Connect(peer, coordinatorAddress, connectPassword))
-    {
-        return COORDINATOR;
-    }
-
-    return NONE;
+    g_reconnectTimeDelta = 10;
 }
 
-void ConnectFailure(eConnectTarget target, const char* errorCode)
+void ActivateReconnectTime()
 {
-    if (target == COORDINATOR)
-    {
-        Log("Failed to connect to coordinator: %s\n", errorCode);
-    }
-    else if (target == EXTERNAL)
-    {
-        Log("Failed to connect to external server: %s\n", errorCode);
-    }
-}
+    Log("Reattempting connection in %d seconds\n", g_reconnectTimeDelta);
 
-#define STARTUP_ERROR_CASE(X) case X: Log("%s\n", #X); break;
-#define CONNECT_ERROR_CASE(X) case X: ConnectFailure(target, #X); return -1;
+    time(&g_reconnectTime);
+    g_reconnectTime += g_reconnectTimeDelta;
+
+    //Sequential fails should wait longer between re-attempts, but cap max wait time so it doesn't wait too long
+    if (g_reconnectTimeDelta < 300)
+        g_reconnectTimeDelta *= 10;
+}
 
 int main(int argc, char *argv[])
 {
@@ -185,36 +243,18 @@ int main(int argc, char *argv[])
     if (clientPassword[0])
         peer->SetIncomingPassword(clientPassword, strlen(clientPassword));
 
-    Log("RakPeer startup %d\n", result);
+    Log("RakPeer startup %s\n", ToString(result));
 
-    if (result != 0)
-    {
-        switch (result)
-        {
-            STARTUP_ERROR_CASE(RAKNET_ALREADY_STARTED);
-            STARTUP_ERROR_CASE(INVALID_SOCKET_DESCRIPTORS);
-            STARTUP_ERROR_CASE(INVALID_MAX_CONNECTIONS);
-            STARTUP_ERROR_CASE(SOCKET_FAMILY_NOT_SUPPORTED);
-            STARTUP_ERROR_CASE(SOCKET_PORT_ALREADY_IN_USE);
-            STARTUP_ERROR_CASE(SOCKET_FAILED_TO_BIND);
-            STARTUP_ERROR_CASE(SOCKET_FAILED_TEST_SEND);
-            STARTUP_ERROR_CASE(PORT_CANNOT_BE_ZERO);
-            STARTUP_ERROR_CASE(FAILED_TO_CREATE_NETWORK_THREAD);
-            STARTUP_ERROR_CASE(COULD_NOT_GENERATE_GUID);
-            STARTUP_ERROR_CASE(STARTUP_OTHER_FAILURE);
-        }
-
+    if (result != RAKNET_STARTED)
         return -1;
-    }
-
-    //If running the coordinator and server on the same peer, then we need to deduce our external IP.
-    //Easiest way to do this is to connect to the punchthrough server and look at our external IP address for it
-        
+    
     if (externalServer)
     {
-        if (Connect(peer, externalServer, ""))
+        target = EXTERNAL;
+
+        if (!Connect(peer, externalServer, ""))
         {
-            target = EXTERNAL;
+            ActivateReconnectTime();
         }
     }
     else
@@ -222,7 +262,12 @@ int main(int argc, char *argv[])
         if (externalAddress)
             proxyServer.SetServerPublicIP(externalAddress);
 
-        target = LoginToCoordinator(peer, &proxyServer, clientPassword, coordinatorAddress, coordinatorPassword);
+        target = COORDINATOR;
+
+        if (!Connect(peer, coordinatorAddress, clientPassword))
+        {
+            ActivateReconnectTime();
+        }
     }
 
 	while (true)
@@ -237,8 +282,12 @@ int main(int argc, char *argv[])
             {
             case ID_CONNECTION_REQUEST_ACCEPTED:
             {
+                ResetReconnectTimeDelta();
+
                 if (target == COORDINATOR)
                 {
+                    Log("Connected to coordinator, logging in\n");
+
                     target = NONE;
                     proxyServer.LoginToCoordinator(coordinatorPassword, p->systemAddress);
                 }
@@ -249,18 +298,78 @@ int main(int argc, char *argv[])
                     proxyServer.SetServerPublicIP(externalSystemAddress.ToString(false));
                     peer->CloseConnection(p->systemAddress, false);
 
-                    target = LoginToCoordinator(peer, &proxyServer, clientPassword, coordinatorAddress, coordinatorPassword);
+                    target = COORDINATOR;
+
+                    if (!Connect(peer, coordinatorAddress, clientPassword))
+                    {
+                        ActivateReconnectTime();
+                    }
                 }
                 break;
             }
 
-            CONNECT_ERROR_CASE(ID_CONNECTION_ATTEMPT_FAILED);
-            CONNECT_ERROR_CASE(ID_ALREADY_CONNECTED);
-            CONNECT_ERROR_CASE(ID_NO_FREE_INCOMING_CONNECTIONS);
-            CONNECT_ERROR_CASE(ID_CONNECTION_BANNED);
-            CONNECT_ERROR_CASE(ID_INVALID_PASSWORD);
+            case ID_CONNECTION_ATTEMPT_FAILED:
+            case ID_ALREADY_CONNECTED:
+            case ID_NO_FREE_INCOMING_CONNECTIONS:
+            case ID_CONNECTION_BANNED:
+            case ID_INVALID_PASSWORD:
+            {
+                if (target == COORDINATOR)
+                {
+                    Log("Failed to connect to coordinator: %s\n", ToString(p->data[0]));
+                    ActivateReconnectTime();
+                }
+                else if (target == EXTERNAL)
+                {
+                    Log("Failed to connect to external server: %s\n", ToString(p->data[0]));
+                    ActivateReconnectTime();
+                }
+            }
+            break;
+
+            case ID_DISCONNECTION_NOTIFICATION:
+            case ID_CONNECTION_LOST:
+            {
+                const char* sysAddress = p->systemAddress.ToString(true, ':');
+
+                if (strcmp(sysAddress, coordinatorAddress) == 0)
+                {
+                    Log("Connection lost to %s : %s\n", sysAddress, ToString(p->data[0]));
+                    ActivateReconnectTime();
+
+                    target = COORDINATOR;
+                }
+            }
+            break;
+
             }
 		}
+
+        if (g_reconnectTime != -1)
+        {
+            time_t now;
+            time(&now);
+
+            if (now > g_reconnectTime)
+            {
+                g_reconnectTime = -1;
+
+                if (target == COORDINATOR)
+                {
+                    if (Connect(peer, coordinatorAddress, clientPassword))
+                        g_reconnectTime = -1;
+                    else
+                        ActivateReconnectTime();
+                }
+                else if (target == EXTERNAL)
+                {
+                    if(Connect(peer, externalServer, ""))
+                        g_reconnectTime = -1;
+                    else
+                        ActivateReconnectTime();
+                }
+            }
+        }
 
 		// Keep raknet threads responsive
 		RakSleep(30);
