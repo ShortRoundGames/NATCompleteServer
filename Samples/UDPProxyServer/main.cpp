@@ -162,7 +162,7 @@ void ActivateReconnectTime()
 
     //Sequential fails should wait longer between re-attempts, but cap max wait time so it doesn't wait too long
     if (g_reconnectTimeDelta < 300)
-        g_reconnectTimeDelta *= 10;
+        g_reconnectTimeDelta *= 2;
 }
 
 int main(int argc, char *argv[])
