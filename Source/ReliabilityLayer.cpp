@@ -3204,12 +3204,25 @@ InternalPacket * ReliabilityLayer::BuildPacketFromSplitPacketList( SplitPacketCh
 	internalPacket->allocationScheme=InternalPacket::NORMAL;
 
     BitSize_t offset = 0;
-	for (j=0; j < splitPacketChannel->splitPacketList.Size(); j++)
-	{
-		splitPacket=splitPacketChannel->splitPacketList[j];
-        memcpy(internalPacket->data + BITS_TO_BYTES(offset), splitPacket->data, (size_t)BITS_TO_BYTES(splitPacketChannel->splitPacketList[j]->dataBitLength));
-        offset += splitPacketChannel->splitPacketList[j]->dataBitLength;
-	}
+    for (j = 0; j < splitPacketChannel->splitPacketList.Size(); j++)
+    {
+        splitPacket = NULL;
+
+        for (int a = 0; a < splitPacketChannel->splitPacketList.Size(); a++)
+        {
+            if (splitPacketChannel->splitPacketList[a]->splitPacketIndex != j)
+                continue;
+
+            splitPacket = splitPacketChannel->splitPacketList[a];
+            break;
+        }
+
+        if (splitPacket == NULL)
+            splitPacket = splitPacketChannel->splitPacketList[j];
+
+        memcpy(internalPacket->data + BITS_TO_BYTES(offset), splitPacket->data, (size_t)BITS_TO_BYTES(splitPacket->dataBitLength));
+        offset += splitPacket->dataBitLength;
+    }
 
 	for (j=0; j < splitPacketChannel->splitPacketList.Size(); j++)
 	{
