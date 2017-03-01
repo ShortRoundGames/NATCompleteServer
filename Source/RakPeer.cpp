@@ -3117,6 +3117,30 @@ void RakPeer::GetStatisticsList(DataStructures::List<SystemAddress> &addresses, 
 	}
 }
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+int RakPeer::GetStatisticsArray(SystemAddress* addresses, RakNetGUID* guids, RakNetStatistics* statistics, int maxSize)
+{
+	if (remoteSystemList == 0 || endThreads == true)
+		return 0;
+
+	unsigned int pushCount = 0;
+	for (unsigned i = 0; i < activeSystemListSize && pushCount < maxSize; i++)
+	{
+		if ((activeSystemList[i])->isActive &&
+			(activeSystemList[i])->connectMode == RakPeer::RemoteSystemStruct::CONNECTED)
+		{
+			if(addresses)
+				addresses[pushCount] = activeSystemList[i]->systemAddress;
+			if(guids)
+				guids[pushCount] = activeSystemList[i]->guid;
+			if(statistics)
+				activeSystemList[i]->reliabilityLayer.GetStatistics(&statistics[pushCount]);
+
+			++pushCount;
+		}
+	}
+	return pushCount;
+}
+// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool RakPeer::GetStatistics( const unsigned int index, RakNetStatistics *rns )
 {
 	if (index < maximumNumberOfPeers && remoteSystemList[ index ].isActive)
