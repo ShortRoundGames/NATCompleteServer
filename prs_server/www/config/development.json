@@ -1,0 +1,44 @@
+{
+    "server": {
+        "port": 80,
+        "dev_tokens": {
+            "SR:PRS:bQBiS4kG": "fyfVstO6JfdtKP0ED6gvD3balCeEWAKH"
+        }
+    },
+    "redis": {
+      "database_index": 2,
+      "pools": {
+        "proxy_reg": "127.0.0.1:6379"
+      }
+    },
+    "srlog": {
+      "log_express_errors": false,      
+      "tables": [
+        {
+          "name": "error",
+          "file": true,
+          "console": true
+        },
+        {
+          "name": "bad_request",
+          "file": true,
+          "console": true
+        },
+        {
+          "name": "api",
+          "file": true,
+          "console": true
+        },
+        {
+          "name": "cluster",
+          "file": true,
+          "console": true
+        },
+        {
+          "name": "warning",
+          "file": true,
+          "console": true
+        }
+      ]
+    }
+  }

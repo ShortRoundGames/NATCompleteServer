@@ -1,0 +1,6 @@
+*.v12.suo
+*.vs
+.ntvs_analysis.dat
+.ntvs_analysis.dat.tmp
+obj/
+bin/

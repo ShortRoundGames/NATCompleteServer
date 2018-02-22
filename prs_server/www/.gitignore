@@ -1,0 +1,8 @@
+/typings/
+/node_modules/@google-cloud
+*.ntvs_analysis.dat
+*.tmp
+*.pdb
+*.sln
+*.vcxproj*
+*.tlog*
