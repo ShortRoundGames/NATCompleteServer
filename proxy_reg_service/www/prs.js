@@ -55,12 +55,14 @@ async.series(
         
         var url = ip.address()
 
+        heartbeat_set.set(url, Date.now(), srlog.errorCallback);
+
         setInterval(
             function()
             {
                 heartbeat_set.set(url, Date.now(), srlog.errorCallback);
             },
-            5 * 1000);
+            60 * 1000);
     });
 
 

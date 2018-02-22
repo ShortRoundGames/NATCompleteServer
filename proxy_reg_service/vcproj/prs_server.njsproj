@@ -3358,8 +3358,13 @@
     <Content Include="webviews\views\events\test.html" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="blackJack\" />
+    <Folder Include="globalOutbreak\" />
     <Folder Include="init\" />
     <Folder Include="config\" />
+    <Folder Include="rivalGears\" />
+    <Folder Include="rivalGears\account\" />
+    <Folder Include="rivalGears\account\actions\" />
     <Folder Include="rivalGears\admin\" />
     <Folder Include="rivalGears\admin\bower_components\" />
     <Folder Include="rivalGears\admin\bower_components\font-roboto\" />
@@ -3828,10 +3833,15 @@
     <Folder Include="sr_lib\server\" />
     <Folder Include="sr_lib\notifications\" />
     <Folder Include="sr_lib\twitter\" />
+    <Folder Include="tools\" />
+    <Folder Include="views\" />
     <Folder Include="views\examples\" />
     <Folder Include="views\layouts\" />
     <Folder Include="views\partials\" />
     <Folder Include="views\scripts\" />
+    <Folder Include="webviews\" />
+    <Folder Include="webviews\bower_components\" />
+    <Folder Include="webviews\bower_components\font-roboto\" />
     <Folder Include="webviews\bower_components\hydrolysis\" />
     <Folder Include="webviews\bower_components\iron-a11y-announcer\" />
     <Folder Include="webviews\bower_components\iron-a11y-announcer\demo\" />
