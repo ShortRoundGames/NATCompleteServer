@@ -3,3 +3,5 @@ Debug/
 *.vcxproj.user
 *.sdf
 *.opensdf
+*.db
+*.opendb

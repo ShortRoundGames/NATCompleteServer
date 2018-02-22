@@ -138,7 +138,7 @@ bool Connect(RakNet::RakPeerInterface* peer, char* addressAndPort, char* passwor
     }
     else
     {
-        Log("addresses should be in form 'address:port'");
+        Log("addresses should be in form 'address:port', addr:%s\n", addressCopy);
     }
 
     delete[] addressCopy;
