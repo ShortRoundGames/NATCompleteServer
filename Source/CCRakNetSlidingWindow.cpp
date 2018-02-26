@@ -27,6 +27,10 @@ static const CCTimeType SYN=10000;
 #include "RakAssert.h"
 #include "RakAlloca.h"
 
+#ifdef _WIN32
+	#include <cmath>
+#endif
+
 using namespace RakNet;
 
 // ****************************************************** PUBLIC METHODS ******************************************************
