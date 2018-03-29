@@ -623,6 +623,10 @@ public:
 	/// \param[out] statistics Calculated RakNetStatistics for each connected system
 	virtual void GetStatisticsList(DataStructures::List<SystemAddress> &addresses, DataStructures::List<RakNetGUID> &guids, DataStructures::List<RakNetStatistics> &statistics);
 
+	///SR:Dan - GetStatisticsList does a massive amount of memory allocation/deallocation if the peer has a large number of connections
+	//			so I created a variation that takes a triplet of pre-allocated arrays and uses them instead
+	virtual int GetStatisticsArray(SystemAddress* addresses, RakNetGUID* guids, RakNetStatistics* statistics, int maxSize);
+
 	/// \Returns how many messages are waiting when you call Receive()
 	virtual unsigned int GetReceiveBufferSize(void);
 

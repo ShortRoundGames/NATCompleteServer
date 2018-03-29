@@ -237,6 +237,9 @@ int main(int argc, char *argv[])
     proxyServer.SetResultHandler(&resultHandler);
     peer->AttachPlugin(&proxyServer);
 
+	//Default is to only allow 64 forwardings (ie. 128 connections)
+	proxyServer.udpForwarder.SetMaxForwardEntries(5000);
+
     RakNet::SocketDescriptor socketDescriptor(port, 0);
     RakNet::StartupResult result = peer->Startup(MAX_CONNECTIONS, &socketDescriptor, 1);
 

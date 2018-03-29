@@ -1512,6 +1512,8 @@ namespace RakNet
 		{
 #if RAKNET_SUPPORT_IPV6==1
 			bool b = ReadBits((unsigned char*) &outTemplateVar.address.addr6, sizeof(outTemplateVar.address.addr6)*8, true);
+			//Sr:Dan - This will equal whatever AF_INET6 was on the other peer's platform, which may not be the same for our platform
+			outTemplateVar.address.addr6.sin6_family = AF_INET6;
 			outTemplateVar.debugPort=ntohs(outTemplateVar.address.addr6.sin6_port);
 			return b;
 #else
